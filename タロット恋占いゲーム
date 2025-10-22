@@ -1,0 +1,377 @@
+index.html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>恋タロット占い</title>
+    <!-- Tailwind CSS CDNを読み込み、モダンでレスポンシブなデザインを実現します -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Google Fontsから日本語フォントを読み込む */
+        @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;700&display=swap');
+        
+        /* カスタムスタイル */
+        body {
+            font-family: 'Shippori Mincho', serif;
+            background-color: #fce7f3; /* 薄いピンクの背景 */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .card-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem; /* カード間のスペース */
+        }
+
+        .tarot-card {
+            width: 120px;
+            height: 180px;
+            background-color: #7c3aed; /* 濃い紫のカード背面 */
+            border: 4px solid #fcd34d; /* 黄金色の枠線 */
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fcd34d;
+            font-size: 1.5rem;
+            font-weight: bold;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            user-select: none; /* テキスト選択を禁止 */
+        }
+
+        .tarot-card:hover:not(.selected) {
+            transform: translateY(-5px) scale(1.03);
+            box-shadow: 0 15px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .tarot-card.selected {
+            /* 選択されたカードのスタイル */
+            transform: scale(1.05);
+            background-color: #9333ea; /* 少し明るい紫 */
+            box-shadow: 0 0 0 4px #10b981, 0 10px 15px rgba(0, 0, 0, 0.5); /* エメラルドグリーンのハイライト */
+            pointer-events: none; /* 2度押しを禁止 */
+        }
+
+        .tarot-card.revealed {
+            background-color: #fff; /* 結果表示後は白地に */
+            color: #312e81; /* 濃い青色の文字 */
+            border-color: #f97316; /* オレンジ色の枠線 */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            padding: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+            line-height: 1.2;
+            transform: none !important; /* アニメーションをリセット */
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .reveal-button {
+            transition: all 0.3s ease;
+        }
+        
+        /* レスポンシブ対応 */
+        @media (max-width: 600px) {
+            .tarot-card {
+                width: 100px;
+                height: 150px;
+            }
+            .card-container {
+                gap: 1rem;
+            }
+            .tarot-card.revealed {
+                font-size: 0.8rem;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body class="p-6">
+    <div id="app" class="w-full max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-2xl">
+        <h1 class="text-4xl font-bold text-center text-pink-600 mb-2">💘 恋タロット占い 💘</h1>
+        <p id="instruction" class="text-center text-gray-700 text-xl mb-8">
+            未来、現状、対策として、**3枚**のカードを選んでください。
+        </p>
+
+        <!-- カードコンテナ -->
+        <div id="cards-wrapper" class="card-container mb-10">
+            <!-- JavaScriptで5枚のカードがここに生成されます -->
+        </div>
+
+        <!-- 結果表示とボタン -->
+        <div id="controls" class="text-center">
+            <button id="reveal-btn" 
+                    class="reveal-button bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-6 rounded-full shadow-lg opacity-50 cursor-not-allowed" 
+                    disabled>
+                結果を見る
+            </button>
+            <button id="reset-btn" 
+                    class="reveal-button bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-full shadow-lg ml-4 hidden">
+                もう一度占う
+            </button>
+        </div>
+
+        <!-- 結果のモーダル表示エリア -->
+        <div id="result-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 hidden">
+            <div class="bg-white p-8 rounded-xl shadow-2xl max-w-xl w-full">
+                <h2 class="text-3xl font-bold text-pink-600 text-center mb-6">💖 占い結果 💖</h2>
+                <div id="reading-result" class="space-y-6 text-gray-800">
+                    <!-- 占いの結果がここに表示されます -->
+                </div>
+                <div class="text-center mt-8">
+                    <button id="close-modal-btn" class="bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-6 rounded-full shadow-lg">
+                        閉じる
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // -----------------------------------------------------------
+        // 1. データ定義 (タロットカードの情報)
+        // -----------------------------------------------------------
+
+        const TAROT_DECK = [
+            { name: "恋人たち", meaning: "愛の選択、結ばれる運命、調和", reversal: "誘惑、失恋、誤った選択" },
+            { name: "力", meaning: "意志の強さ、優しさ、忍耐力", reversal: "無力、自信喪失、傲慢" },
+            { name: "隠者", meaning: "内省、慎重、探求", reversal: "閉鎖的、孤独、逃避" },
+            { name: "運命の輪", meaning: "転機、チャンス到来、幸運", reversal: "状況の悪化、すれ違い、停滞" },
+            { name: "節制", meaning: "バランス、協力、調整", reversal: "浪費、不調和、衝突" },
+            { name: "太陽", meaning: "成功、喜び、祝福、結婚", reversal: "失敗、絶望、暗雲" },
+            { name: "月", meaning: "不安、幻想、曖昧さ、秘密", reversal: "真実が明らかになる、解消" },
+            { name: "星", meaning: "希望、インスピレーション、願いが叶う", reversal: "失望、無気力、叶わぬ夢" },
+            { name: "皇帝", meaning: "支配力、安定、責任感", reversal: "未熟、傲慢、強引" },
+            { name: "女帝", meaning: "豊かさ、優しさ、包容力、妊娠", reversal: "空回り、わがまま、散財" },
+        ];
+
+        const CARD_POSITIONS = ["**未来**", "**現状**", "**対策**"];
+        const NUM_CARDS_TO_DRAW = 3;
+        const NUM_TOTAL_CARDS = 5; // 場に出すカードの総数
+
+        let availableCards = []; // 現在選べるカードのインデックス
+        let selectedCards = []; // 選択されたカードの情報を格納
+        
+        // -----------------------------------------------------------
+        // 2. ユーティリティ関数
+        // -----------------------------------------------------------
+
+        // 配列をシャッフルする関数 (フィッシャー・イェーツ・シャッフル)
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // -----------------------------------------------------------
+        // 3. UI/ゲームロジック関数
+        // -----------------------------------------------------------
+
+        const cardsWrapper = document.getElementById('cards-wrapper');
+        const instruction = document.getElementById('instruction');
+        const revealBtn = document.getElementById('reveal-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const resultModal = document.getElementById('result-modal');
+        const readingResult = document.getElementById('reading-result');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+
+        // ゲームを初期化する
+        function initializeGame() {
+            // 1. カードの山札を作成し、シャッフル
+            availableCards = [];
+            for(let i = 0; i < TAROT_DECK.length; i++) {
+                availableCards.push(i);
+            }
+            shuffleArray(availableCards);
+            
+            // 2. 選択されたカードをリセット
+            selectedCards = [];
+
+            // 3. UIを初期状態に戻す
+            instruction.textContent = `未来、現状、対策として、${NUM_CARDS_TO_DRAW}枚のカードを選んでください。`;
+            revealBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            revealBtn.disabled = true;
+            resetBtn.classList.add('hidden');
+            resultModal.classList.add('hidden');
+            cardsWrapper.innerHTML = ''; // カードコンテナを空にする
+
+            // 4. 場にカードを配置
+            placeCardsOnTable();
+        }
+
+        // カードを場に配置する
+        function placeCardsOnTable() {
+            const indicesToUse = availableCards.slice(0, NUM_TOTAL_CARDS); // デッキの最初のN枚を使用
+            
+            for (let i = 0; i < NUM_TOTAL_CARDS; i++) {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'tarot-card';
+                cardElement.dataset.cardIndex = indicesToUse[i];
+                cardElement.textContent = 'タロット';
+                cardElement.addEventListener('click', handleCardClick);
+                cardsWrapper.appendChild(cardElement);
+            }
+        }
+
+        // カードがクリックされたときの処理
+        function handleCardClick(event) {
+            const cardElement = event.currentTarget;
+
+            if (selectedCards.length < NUM_CARDS_TO_DRAW) {
+                // 選択可能な残り枚数がある場合
+                const cardIndex = parseInt(cardElement.dataset.cardIndex);
+                
+                // 正位置か逆位置かをランダムに決定 (0:正位置, 1:逆位置)
+                const isReversed = Math.random() < 0.5;
+
+                // 選択されたカード情報を記録
+                selectedCards.push({
+                    index: cardIndex,
+                    isReversed: isReversed,
+                    element: cardElement,
+                    position: CARD_POSITIONS[selectedCards.length] // どの位置のカードか
+                });
+                
+                // UIを更新
+                cardElement.classList.add('selected');
+                cardElement.textContent = selectedCards.length; // 選択順序を表示
+                
+                // 説明文を更新
+                const remaining = NUM_CARDS_TO_DRAW - selectedCards.length;
+                if (remaining > 0) {
+                    instruction.textContent = `あと **${remaining}枚** 選んでください。`;
+                } else {
+                    instruction.textContent = `3枚選び終わりました。「結果を見る」ボタンを押してください。`;
+                }
+
+                // 全て選び終わったら結果ボタンを活性化
+                if (selectedCards.length === NUM_CARDS_TO_DRAW) {
+                    revealBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    revealBtn.disabled = false;
+                }
+            }
+        }
+
+        // 結果を表示する処理
+        function revealResult() {
+            // 1. 結果ボタンを非活性化し、リセットボタンを表示
+            revealBtn.classList.add('hidden');
+            resetBtn.classList.remove('hidden');
+
+            // 2. カードをオープンし、意味を表示
+            selectedCards.forEach(card => {
+                const data = TAROT_DECK[card.index];
+                card.element.classList.remove('selected');
+                card.element.classList.add('revealed', 'bg-white');
+                card.element.innerHTML = `
+                    <span class="text-xs font-bold text-gray-500">${card.position}</span>
+                    <span class="text-lg font-extrabold text-red-500">${data.name}</span>
+                    <span class="text-sm font-normal text-gray-700">${card.isReversed ? '逆位置' : '正位置'}</span>
+                `;
+            });
+            
+            // 3. 残りのカードを非活性化
+            const remainingCards = Array.from(cardsWrapper.children).filter(card => !card.classList.contains('revealed'));
+            remainingCards.forEach(card => card.style.opacity = '0.5');
+
+            // 4. モーダルに結果テキストを生成して表示
+            generateAndShowReading();
+        }
+
+        // 占い結果の文章を生成し、モーダルに表示する
+        function generateAndShowReading() {
+            let resultHTML = '';
+
+            // 各カードの結果を詳細に表示
+            selectedCards.forEach((cardInfo, index) => {
+                const data = TAROT_DECK[cardInfo.index];
+                const direction = cardInfo.isReversed ? '逆位置' : '正位置';
+                const meaning = cardInfo.isReversed ? data.reversal : data.meaning;
+
+                resultHTML += `
+                    <div class="border-b pb-4 last:border-b-0">
+                        <h3 class="text-xl font-bold text-gray-700 mb-2">${CARD_POSITIONS[index]}のカード：<span class="text-red-500">${data.name}</span> (${direction})</h3>
+                        <p class="text-base leading-relaxed">
+                            <span class="font-bold text-pink-700">【キーワード】</span>${meaning}
+                        </p>
+                    </div>
+                `;
+            });
+
+            // 総合アドバイス (簡潔なまとめ)
+            const summaryAdvice = getSummaryAdvice(selectedCards);
+
+            resultHTML += `
+                <div class="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-300">
+                    <h3 class="text-xl font-bold text-yellow-800 mb-2">✨ 総合アドバイス ✨</h3>
+                    <p class="text-base leading-relaxed text-yellow-900">${summaryAdvice}</p>
+                </div>
+            `;
+
+            readingResult.innerHTML = resultHTML;
+            resultModal.classList.remove('hidden'); // モーダルを表示
+        }
+
+        // 簡易的な総合アドバイスの生成
+        function getSummaryAdvice(cards) {
+            const futureCard = cards.find(c => c.position.includes('未来'));
+            const presentCard = cards.find(c => c.position.includes('現状'));
+            const adviceCard = cards.find(c => c.position.includes('対策'));
+
+            let advice = "この占いはあなたの恋の行方を示しています。";
+
+            if (futureCard && futureCard.name === "太陽") {
+                advice += `未来には「太陽」が出ており、とても明るい兆しです！自信を持って行動しましょう。`;
+            } else if (adviceCard && adviceCard.isReversed && adviceCard.name === "力") {
+                advice += `「対策」のカードが逆位置の「力」です。焦らず、今は一歩引いて状況を観察する冷静さが必要です。`;
+            } else if (presentCard && presentCard.name === "恋人たち" && !presentCard.isReversed) {
+                advice += `現状は「恋人たち」の正位置。今は愛の調和が取れている状態です。この流れを大切にしてください。`;
+            } else {
+                advice += `カードは未来、現状、対策それぞれの重要なヒントを与えてくれています。特に「対策」のカードの意味を深く読み解き、行動に活かしましょう。`;
+            }
+            return advice;
+        }
+
+
+        // -----------------------------------------------------------
+        // 4. イベントリスナーの設定
+        // -----------------------------------------------------------
+
+        // 結果を見るボタン
+        revealBtn.addEventListener('click', () => {
+            if (selectedCards.length === NUM_CARDS_TO_DRAW) {
+                revealResult();
+            } else {
+                // 安全装置：もしボタンが押せてしまっても枚数が不足していたらメッセージを出す
+                // 組み込みのalert()は使えないため、コンソールに出力します。
+                console.error("カードは3枚選んでください。");
+            }
+        });
+
+        // もう一度占うボタン
+        resetBtn.addEventListener('click', initializeGame);
+
+        // モーダルを閉じるボタン
+        closeModalBtn.addEventListener('click', () => {
+            resultModal.classList.add('hidden');
+        });
+
+        // -----------------------------------------------------------
+        // 5. ゲーム開始
+        // -----------------------------------------------------------
+
+        window.onload = initializeGame; // ページ読み込み完了後にゲーム開始
+    </script>
+</body>
+</html>
